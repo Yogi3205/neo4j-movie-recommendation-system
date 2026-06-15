@@ -1,0 +1,50 @@
+# Virtual Environment
+venv/
+.env/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / Packaging
+build/
+dist/
+*.egg-info/
+
+# IDE Files
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment Variables
+.env
+
+# Neo4j Local Files (if any)
+data/
+logs/
+plugins/
+import/
+
+# Temporary Files
+*.tmp
+*.bak
+
+# Python Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# SQLite Databases
+*.db
+*.sqlite3

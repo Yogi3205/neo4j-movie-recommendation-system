@@ -1,302 +1,101 @@
-# 🎬 Movie Recommendation System using Neo4j and Python
+# 🎬 Graph-Based Movie Recommender (Neo4j)
 
-## 📌 Project Overview
+This started as a basic demo with 3 hardcoded users (John/Alice/Bob) and a
+similarity query that just counted how many movies two people had in
+common. It worked but wasn't really doing anything interesting, so I
+rebuilt the core logic and added a real dataset + UI to actually test it.
 
-This project demonstrates a Movie Recommendation System built using Neo4j Graph Database and Python.
+## What's different now
 
-The system stores users, movies, genres, actors, and directors as graph nodes and leverages graph relationships to generate personalized movie recommendations.
+- Loads the real [MovieLens](https://grouplens.org/datasets/movielens/) small dataset instead of 3 fake users — about 600 users, 9700 movies, 100k ratings
+- Similarity between users is now cosine similarity computed on actual rating values, not just a count of shared movies. Two users who rated 3 movies the same way are more alike than two who rated 10 and disagreed on most of them — counting alone couldn't capture that
+- New users with little/no rating history get genre + popularity based recommendations instead of nothing (collaborative filtering can't really work for someone with 1 rating)
+- Split into separate files (`config.py`, `db.py`, `recommend.py`, `app.py`) instead of one script
+- Credentials moved to a `.env` file instead of being hardcoded
+- Added a Streamlit UI on top of the old CLI version
+- Added some tests for the recommendation logic (mocked DB, so no need for Neo4j to be running to test)
 
-Unlike traditional relational databases, Neo4j efficiently handles highly connected data, making it ideal for recommendation systems.
+## Data model
 
----
-
-## 🚀 Features
-
-* Store movie information in Neo4j
-* Store user ratings as graph relationships
-* Manage genres, actors, and directors
-* Find users with similar movie preferences
-* Generate personalized movie recommendations
-* Integrate Neo4j with Python
-* Execute Cypher queries from Python
-
----
-
-## 🛠️ Technologies Used
-
-* Neo4j Graph Database
-* Cypher Query Language
-* Python 3.x
-* Neo4j Python Driver
-* Git & GitHub
-
----
-
-## 📊 Graph Data Model
-
-### Nodes
-
-* User
-* Movie
-* Genre
-* Actor
-* Director
-
-### Relationships
-
-```text
-(User)-[:RATED]->(Movie)
-
-(Movie)-[:BELONGS_TO]->(Genre)
-
-(Actor)-[:ACTED_IN]->(Movie)
-
-(Director)-[:DIRECTED]->(Movie)
+```
+(User)-[:RATED {rating, timestamp}]->(Movie)-[:BELONGS_TO]->(Genre)
 ```
 
----
+## How the recommendation logic works
 
-## 🏗️ System Architecture
+If a user has rated at least 4 movies, it does collaborative filtering:
+finds other users who rated overlapping movies, scores similarity with
+cosine similarity, then predicts ratings for unseen movies as a
+similarity-weighted average of what similar users gave them.
 
-```text
-+-------------------+
-|      User         |
-+-------------------+
-          |
-          v
-+-------------------+
-| Python Application|
-+-------------------+
-          |
-          v
-+-------------------+
-| Neo4j Driver      |
-+-------------------+
-          |
-          v
-+-------------------+
-| Neo4j Database    |
-+-------------------+
-```
+If a user has fewer than 4 ratings (or CF can't find any decent matches),
+it falls back to recommending popular movies within genres the user has
+shown interest in — scored with a Bayesian-adjusted average so a movie
+with 2 five-star ratings doesn't outrank one with 500 ratings averaging
+4 stars.
 
----
+The actual queries are in `recommend.py`.
 
-## 📁 Project Structure
-
-```text
-movie-recommendation-system/
-│
-├── app.py
-├── recommendation.py
-├── requirements.txt
-├── .gitignore
-├── README.md
-│
-├── screenshots/
-│   ├── graph.png
-│   ├── recommendation_output.png
-│
-└── queries/
-    ├── create_data.cypher
-    └── recommendation_query.cypher
-```
-
----
-
-## ⚙️ Installation
-
-### 1. Clone Repository
+## Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/neo4j-movie-recommendation-system.git
-
+git clone https://github.com/Yogi3205/neo4j-movie-recommendation-system.git
 cd neo4j-movie-recommendation-system
-```
-
-### 2. Create Virtual Environment
-
-```bash
 python -m venv venv
-```
-
-### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### Linux / Mac
-
-```bash
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
+source venv/bin/activate   # venv\Scripts\activate on windows
 pip install -r requirements.txt
 ```
 
----
+Copy `.env.example` to `.env` and fill in your Neo4j credentials.
 
-## 🗄️ Neo4j Setup
+In Neo4j Browser, run `queries/schema.cypher` once to set up constraints.
 
-1. Install Neo4j Desktop
-2. Create a database instance
-3. Start the database
-4. Open Neo4j Browser
-5. Execute the Cypher scripts to create sample data
-
-Example connection:
-
-```python
-URI = "bolt://localhost:7687"
-USERNAME = "neo4j"
-PASSWORD = "your_password"
-```
-
----
-
-## ▶️ Running the Project
-
+Then load the dataset:
 ```bash
-python app.py
+python data/load_movielens.py
+```
+Takes a couple minutes.
+
+Run the app:
+```bash
+streamlit run app.py
 ```
 
-Example:
-
-```text
-Enter User Name (John/Alice/Bob): Alice
+Or the CLI version:
+```bash
+python recommend.py
 ```
 
----
-
-## 🧠 Recommendation Logic
-
-The recommendation engine uses Collaborative Filtering.
-
-### Steps
-
-1. Find users who have rated similar movies.
-2. Calculate common movie interests.
-3. Identify movies rated by similar users.
-4. Exclude movies already watched by the target user.
-5. Rank recommendations by:
-
-   * Common interests
-   * Average rating
-
-### Recommendation Query Concept
-
-```text
-Alice
-  |
-  +--> Interstellar
-  |
-  +--> Dune
-  |
-  +--> The Matrix
-
-          ^
-          |
-         John
-
-John also liked:
-
-Inception
-Avatar
-Oppenheimer
-
-=> Recommend to Alice
+Run tests:
+```bash
+pytest tests/ -v
 ```
 
----
+## Demo
 
-## 🔍 Sample Cypher Queries
+**Graph view — one user's rating pattern:**
+![User pattern](screenshots/graph-user-pattern.png)
 
-### View User Ratings
+**Graph view — the similarity traversal, visualized:**
+![Similar users](screenshots/graph-similar-users.png)
 
-```cypher
-MATCH (u:User)-[r:RATED]->(m:Movie)
-RETURN u.name, m.title, r.rating
-```
+**App — recommendations:**
+![Recommendations](screenshots/app-recommendations-cf.png)
 
-### Find Similar Users
+## Limitations
 
-```cypher
-MATCH (u:User {name:'Alice'})-[:RATED]->(m:Movie)<-[:RATED]-(other:User)
-WHERE other <> u
-RETURN other.name, COUNT(m) AS CommonMovies
-ORDER BY CommonMovies DESC
-```
+- Similarity only looks at movies both users rated, not their whole rating history — works fine here but would need the Neo4j GDS library to do properly at larger scale
+- No caching of similarity scores, recalculates on every request — would get slow with way more users
 
-### Find Recommended Movies
+## Next steps if I keep working on this
 
-```cypher
-MATCH (u:User {name:'Alice'})-[:RATED]->(m:Movie)<-[:RATED]-(other:User)
-MATCH (other)-[:RATED]->(recommended:Movie)
-WHERE NOT EXISTS {
- MATCH (u)-[:RATED]->(recommended)
-}
-RETURN DISTINCT recommended.title
-```
+- Try Neo4j's GDS `nodeSimilarity` instead of the hand-rolled cosine similarity
+- Wrap it in a small API + Docker so it's actually deployable
 
----
+## Tech stack
 
-## 📈 Sample Output
+Neo4j, Cypher, Python, Streamlit, pytest
 
-```text
-Enter User Name (John/Alice/Bob): Alice
-
-Movies Rated By User:
-
-Interstellar | Rating: 5
-Titanic | Rating: 5
-Dune | Rating: 5
-Forrest Gump | Rating: 5
-The Matrix | Rating: 4
-
-Recommended Movies:
-
-Inception | Avg Rating: 5.0 | Common Interests: 3
-The Dark Knight | Avg Rating: 5.0 | Common Interests: 1
-Avatar | Avg Rating: 4.0 | Common Interests: 1
-Oppenheimer | Avg Rating: 4.0 | Common Interests: 1
-```
-
----
-
-## 🎯 Learning Outcomes
-
-Through this project, I learned:
-
-* Graph Database Fundamentals
-* Neo4j Architecture
-* Cypher Query Language
-* Graph Modeling
-* Relationship Traversal
-* Collaborative Filtering
-* Python-Neo4j Integration
-* Git and GitHub Workflow
-
----
-
-## 🔮 Future Enhancements
-
-* Streamlit Web Interface
-* Movie Search Functionality
-* MovieLens Dataset Integration
-* Neo4j Graph Data Science Algorithms
-* User Authentication
-* REST API Integration
-* Docker Deployment
-
----
-
-## 👨‍💻 Author
+## Author
 
 Yogi K.
-
-Neo4j Movie Recommendation System Project
-
-Built for learning Graph Databases, Neo4j, and Recommendation Systems.
